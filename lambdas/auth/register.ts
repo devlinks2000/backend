@@ -1,6 +1,7 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from "aws-lambda";
 import * as AWS from "aws-sdk";
 import * as AWSXRay from "aws-xray-sdk";
+import { lambdaEnableCors } from "../../utils/lambda_enable_cors";
 
 AWSXRay.captureAWS(require("aws-sdk"));
 
@@ -62,6 +63,7 @@ export const handler = async (
 
     return {
       statusCode: 200,
+      ...lambdaEnableCors(),
       body: JSON.stringify({
         message: "User registered successfully and email verified.",
         ...authResponse.AuthenticationResult,
@@ -71,6 +73,7 @@ export const handler = async (
     console.error("Error processing user registration:", error);
     return {
       statusCode: 500,
+      ...lambdaEnableCors(),
       body: JSON.stringify({ message: error.message }),
     };
   }

@@ -10,6 +10,7 @@ import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as certificates from "aws-cdk-lib/aws-certificatemanager";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import { Cors } from "aws-cdk-lib/aws-apigateway";
 
 interface CdkApiGatewayStackProps extends cdk.StackProps {
   userPool: cognito.IUserPool;
@@ -370,7 +371,9 @@ export class CdkApiGatewayStack extends cdk.Stack {
 
   private addCorsToResource(resource: apigateway.IResource) {
     resource.addCorsPreflight({
-      allowOrigins: ["http://localhost:5173"],
+      allowOrigins: ["http://localhost:5173", "https://davidarevalo.xyz"],
+      allowHeaders: ["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token", "X-Amz-User-Agent"],
+      allowCredentials: true,
       allowMethods: apigateway.Cors.ALL_METHODS,
     });
   }
