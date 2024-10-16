@@ -32,7 +32,10 @@ export const handler = async (
     } = formData;
 
     // Validate and process the avatar if provided
-    if (avatar && avatar.contentType?.startsWith("image/")) {
+    if (
+      typeof avatar === "object" &&
+      avatar.contentType?.startsWith("image/")
+    ) {
       // Convert Base64-encoded image to buffer
       const avatarBuffer = Buffer.from(avatar.content, "base64");
       avatarFile = {
@@ -40,8 +43,6 @@ export const handler = async (
         contentType: avatar.contentType,
         filename: `${nanoid()}${extname(avatar.filename)}`,
       };
-    } else if (avatar) {
-      throw new Error("Invalid file type, only images are allowed");
     }
 
     // Check if the item already exists in DynamoDB
@@ -120,11 +121,13 @@ export const handler = async (
           TableName: process.env.DYNAMO_TABLE_NAME!,
           Key: { userId },
           UpdateExpression:
-            "set avatar = :avatar, firstName = :firstName, lastName = :lastName",
+            "set avatar = :avatar, firstName = :firstName, lastName = :lastName, email = :email, links = :links",
           ExpressionAttributeValues: {
             ":avatar": avatarUrl || "",
             ":firstName": firstName,
             ":lastName": lastName,
+            ":email": email,
+            ":links": links,
           },
         })
         .promise();
