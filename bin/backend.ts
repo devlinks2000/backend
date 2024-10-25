@@ -5,8 +5,8 @@ import { CdkApiGatewayStack } from "../lib/cdk-api-gateway-stack";
 import * as dotenv from "dotenv";
 import { CognitoStack } from "../lib/cognito-stack";
 import { DBStack } from "../lib/db-stack";
+import { MonitoringStack } from "../lib/cloudwatch-stack";
 
-// Load environment variables from .env file
 dotenv.config();
 
 const app = new cdk.App();
@@ -24,9 +24,14 @@ const db = new DBStack(app, "DBStack", {
   env,
 });
 
-new CdkApiGatewayStack(app, "CdkApiGatewayStack", {
+const cdkApiGatewayStack = new CdkApiGatewayStack(app, "CdkApiGatewayStack", {
   env,
   userPool: cognito.userPool,
   userPoolClient: cognito.userPoolClient,
   devlinksTable: db.devlinksTable,
 });
+
+new MonitoringStack(app, "MonitoringStack", {
+  env,
+  api: cdkApiGatewayStack.api,
+})

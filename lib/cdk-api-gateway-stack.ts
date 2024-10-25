@@ -10,7 +10,6 @@ import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as certificates from "aws-cdk-lib/aws-certificatemanager";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import { Cors } from "aws-cdk-lib/aws-apigateway";
 
 interface CdkApiGatewayStackProps extends cdk.StackProps {
   userPool: cognito.IUserPool;
@@ -19,6 +18,8 @@ interface CdkApiGatewayStackProps extends cdk.StackProps {
 }
 
 export class CdkApiGatewayStack extends cdk.Stack {
+  public readonly api: apigateway.RestApi;
+
   constructor(scope: Construct, id: string, props: CdkApiGatewayStackProps) {
     super(scope, id, props);
 
@@ -28,11 +29,12 @@ export class CdkApiGatewayStack extends cdk.Stack {
     const customDomain = this.createApiGatewayDomain(domainName, certificate);
     this.createApiGatewayAliasRecord(customDomain, hostedZone);
 
-    const api = this.createApiGateway();
+    this.api = this.createApiGateway();
+    // props.createApiGatewayMonitoring(api)
 
-    const requestValidator = this.createRequestValidator(api);
+    const requestValidator = this.createRequestValidator(this.api);
     const registerRequestModel = this.createRequestModel(
-      api,
+      this.api,
       "RegisterRequestModel",
       {
         email: { type: apigateway.JsonSchemaType.STRING },
@@ -42,7 +44,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
     );
 
     const loginRequestModel = this.createRequestModel(
-      api,
+      this.api,
       "LoginRequestModel",
       {
         username: { type: apigateway.JsonSchemaType.STRING },
@@ -88,7 +90,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
     );
 
     this.createApiMethods(
-      api,
+      this.api,
       registerLambda,
       loginLambda,
       requestValidator,
@@ -112,14 +114,14 @@ export class CdkApiGatewayStack extends cdk.Stack {
 
     this.grantTablePermissions(getLinkLambda, props.devlinksTable);
 
-    const linkResource = api.root.addResource("link");
+    const linkResource = this.api.root.addResource("link");
     this.addCorsToResource(linkResource);
     this.addLinkResourceMethods(
       linkResource,
       createLinkLambda,
       getLinkLambda,
       props.userPool,
-      api
+      this.api
     );
 
     const privateGetLinkLambda = this.createLambdaFunction(
@@ -146,7 +148,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
 
     this.grantTablePermissions(privateGetLinkLambda, props.devlinksTable);
 
-    const privateGetLinkResource = api.root.addResource("privateLink");
+    const privateGetLinkResource = this.api.root.addResource("privateLink");
     this.addCorsToResource(privateGetLinkResource);
     privateGetLinkResource.addMethod(
       "GET",
@@ -168,7 +170,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
                 this,
                 "ErrorResponseModel401",
                 {
-                  restApi: api,
+                  restApi: this.api,
                   contentType: "application/json",
                   schema: {
                     type: apigateway.JsonSchemaType.OBJECT,
@@ -192,7 +194,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
                 "ErrorResponseModel403",
                 {
                   // Unique name
-                  restApi: api,
+                  restApi: this.api,
                   contentType: "application/json",
                   schema: {
                     type: apigateway.JsonSchemaType.OBJECT,
@@ -215,8 +217,8 @@ export class CdkApiGatewayStack extends cdk.Stack {
     // Custom domain mapping
     new apigateway.BasePathMapping(this, "BasePathMapping", {
       domainName: customDomain,
-      restApi: api,
-      stage: api.deploymentStage,
+      restApi: this.api,
+      stage: this.api.deploymentStage,
     });
   }
 
@@ -257,7 +259,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
         new route53Targets.ApiGatewayDomain(customDomain)
       ),
       zone: hostedZone,
-      ttl: cdk.Duration.minutes(1), // TTL for the DNS record
+      ttl: cdk.Duration.minutes(1),
     });
   }
 
@@ -272,8 +274,8 @@ export class CdkApiGatewayStack extends cdk.Stack {
       entry,
       functionName,
       handler: "handler",
-      memorySize: 400, // Increase memory if needed
-      timeout: cdk.Duration.seconds(120), // Increase timeout if needed
+      memorySize: 400,
+      timeout: cdk.Duration.seconds(120),
       bundling: {
         minify: true,
         sourceMap: false,
@@ -371,7 +373,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
 
   private addCorsToResource(resource: apigateway.IResource) {
     resource.addCorsPreflight({
-      allowOrigins: ["http://localhost:5173", "https://davidarevalo.xyz"],
+      allowOrigins: ["http://localhost:5173", `https://${process.env.AWS_DOMAIN_NAME}`],
       allowHeaders: ["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key", "X-Amz-Security-Token", "X-Amz-User-Agent"],
       allowCredentials: true,
       allowMethods: apigateway.Cors.ALL_METHODS,
@@ -382,7 +384,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
     return new s3.Bucket(this, "DevLinksBucket", {
       versioned: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true, // Only for dev/test environments
+      autoDeleteObjects: true,
     });
   }
 
@@ -440,7 +442,7 @@ export class CdkApiGatewayStack extends cdk.Stack {
         {
           statusCode: "200",
           responseModels: {
-            "application/json": apigateway.Model.EMPTY_MODEL, // Replace EmptyModel with Model.EMPTY_MODEL
+            "application/json": apigateway.Model.EMPTY_MODEL,
           },
         },
         {
